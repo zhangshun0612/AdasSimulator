@@ -65,7 +65,7 @@ public class AdasSimulatorService extends Service {
 
                     String line;
                     while((line = reader.readLine()) != null){
-                        if(line.startsWith("$GPRMC")){
+                        if(line.startsWith("$GPRMC" ) || line.startsWith("$GPGGA")){
                             gprmcLines.add(line);
                         }else if(line.startsWith("%INSPVASA")){
                             inspvLines.add(line);
@@ -130,34 +130,42 @@ public class AdasSimulatorService extends Service {
                                 socket.getOutputStream().write((line + "\r\n").getBytes("UTF-8"));
                                 inspvCount++;
 
-                                if (((inspvCount % 10) == 0) && gprmcCount < gprmcLines.size()) {
+                                if (((inspvCount % 10) == 0) && gprmcCount + 1 < gprmcLines.size()) {
                                     line = gprmcLines.get(gprmcCount);
                                     socket.getOutputStream().write((line + "\r\n").getBytes("UTF-8"));
                                     gprmcCount++;
 
-                                    String[] strList = line.split(",");
-                                    if(strList.length >= 9){
-                                        String latStr = strList[3];
-                                        String lonStr = strList[5];
-                                        String dirStr = strList[8];
+                                    if(line.startsWith("$GPRMC")){
+                                        String[] strList = line.split(",");
+                                        if(strList.length >= 9){
+                                            String latStr = strList[3];
+                                            String lonStr = strList[5];
+                                            //String dirStr = strList[8];
 
 
-                                        final double lat = Double.parseDouble(latStr.substring(0, 2)) + (Double.parseDouble(latStr.substring(2)) / 60.0);
+                                            final double lat = Double.parseDouble(latStr.substring(0, 2)) + (Double.parseDouble(latStr.substring(2)) / 60.0);
 
-                                        final double lon = Double.parseDouble(lonStr.substring(0, 3)) + (Double.parseDouble(lonStr.substring(3)) / 60.0);
+                                            final double lon = Double.parseDouble(lonStr.substring(0, 3)) + (Double.parseDouble(lonStr.substring(3)) / 60.0);
 
-                                        final double dir = Double.parseDouble(dirStr);
+                                            //final double dir = Double.parseDouble(dirStr);
 
-                                        mHandler.post(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                if(mCallback != null){
-                                                    mCallback.locationUpdate(lat, lon, dir);
+                                            mHandler.post(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    if(mCallback != null){
+                                                        mCallback.gprmcLineSentCountUpdate(gprmcCount);
+                                                        mCallback.locationUpdate(lat, lon, 0);
+                                                    }
                                                 }
-                                            }
-                                        });
+                                            });
 
+                                        }
                                     }
+                                    //输出GGA数据
+                                    line = gprmcLines.get(gprmcCount);
+                                    socket.getOutputStream().write((line + "\r\n").getBytes("UTF-8"));
+                                    gprmcCount++;
+
                                 }
                             }
                         } catch (IOException e) {
@@ -173,7 +181,7 @@ public class AdasSimulatorService extends Service {
 
                         }
                     }
-                }, new Date(), 100);
+                }, new Date(), 20);
             }
         }).start();
     }
@@ -226,6 +234,7 @@ public class AdasSimulatorService extends Service {
 
     public interface AdasSimulatorCallback{
         void readFileCompleted(int gprmcSize, int inspvSize);
+        void gprmcLineSentCountUpdate(int cnt);
         void locationUpdate(double lat, double lon, double dir);
         void remoteClosed();
     }

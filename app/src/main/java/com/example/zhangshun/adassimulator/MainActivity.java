@@ -1,6 +1,13 @@
 package com.example.zhangshun.adassimulator;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
@@ -12,7 +19,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.example.zhangshun.adassimulator.bean.AdasDataFile;
 
@@ -25,19 +31,30 @@ public class MainActivity extends AppCompatActivity {
 
     private SwipeRefreshLayout mSwipeRefreshLayout;
     private RecyclerView mAdasDataFilesView;
+    private TextView mIpAddressTextView;
 
     private Handler mHandler = new Handler();
 
     private List<AdasDataFile> mDataList = new ArrayList<>();
     private AdasDataFileAdapter mAdapter;
 
+    private NetworkChangeReceiver mReceiver;
+    private IntentFilter mIntentFilter;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        mIntentFilter = new IntentFilter();
+        mIntentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+        mReceiver = new NetworkChangeReceiver();
+        registerReceiver(mReceiver, mIntentFilter);
+
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.fresh_layout);
         mAdasDataFilesView = (RecyclerView) findViewById(R.id.recycler_view);
+        mIpAddressTextView = (TextView) findViewById(R.id.ip_address_tv);
+
         mAdasDataFilesView.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
 
         mAdapter = new AdasDataFileAdapter();
@@ -62,6 +79,27 @@ public class MainActivity extends AppCompatActivity {
         WebService.stop(this);
     }
 
+    private String getLocalIpAddress(){
+        String ipAddress = "";
+        NetworkInfo info = ((ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE))
+                .getActiveNetworkInfo();
+        if(info != null && info.isConnected()){
+            if(info.getType() == ConnectivityManager.TYPE_WIFI){
+                WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+                WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+                ipAddress = intIP2StringIP(wifiInfo.getIpAddress());
+            }
+        }
+
+        return ipAddress;
+    }
+
+    private String intIP2StringIP(int ip){
+        return (ip & 0xFF) + "." +
+                ((ip >> 8) & 0xFF) + "." +
+                ((ip >> 16) & 0xFF) + "." +
+                (ip >> 24 & 0xFF);
+    }
 
     private void loadAdasDataFileList(){
         new Thread(new Runnable() {
@@ -111,6 +149,20 @@ public class MainActivity extends AppCompatActivity {
             return df.format((l / 1024.f)) + "MB";
         }
         return df.format(l / 1024.f / 1024.f) + "GB";
+    }
+
+    class NetworkChangeReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            //Toast.makeText(MainActivity.this, "网络状态变化", Toast.LENGTH_SHORT).show();
+            String ipAddress = getLocalIpAddress();
+            if(ipAddress.isEmpty()){
+                mIpAddressTextView.setText("请链入局域网");
+            }else{
+                mIpAddressTextView.setText("浏览器访问:" + ipAddress + ":" + WebService.HTTP_PORT + "管理Adas数据");
+            }
+        }
     }
 
     class AdasDataFileAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{

@@ -10,6 +10,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.CompoundButton;
 import android.widget.Switch;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.baidu.mapapi.SDKInitializer;
@@ -19,6 +20,7 @@ import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.utils.CoordinateConverter;
 
 public class AdasSimulatorActivity extends AppCompatActivity implements CompoundButton.OnCheckedChangeListener {
 
@@ -28,6 +30,9 @@ public class AdasSimulatorActivity extends AppCompatActivity implements Compound
     private Switch serverSwitch;
     private MapView mMapView;
     private BaiduMap mMap;
+    private TextView mCountTextView;
+
+    private CoordinateConverter mConverter;
 
     private ServiceConnection connection = new ServiceConnection() {
         @Override
@@ -55,18 +60,30 @@ public class AdasSimulatorActivity extends AppCompatActivity implements Compound
         }
 
         @Override
+        public void gprmcLineSentCountUpdate(int cnt) {
+            mCountTextView.setText(String.valueOf(cnt));
+        }
+
+        @Override
         public void locationUpdate(double lat, double lon, double dir) {
+            LatLng sourceCoord = new LatLng(lat, lon);
+            mConverter.from(CoordinateConverter.CoordType.COMMON);
+            mConverter.coord(sourceCoord);
+            LatLng ll = mConverter.convert();
+
             MyLocationData locData = new MyLocationData.Builder()
                 .direction((float)dir)
                 .accuracy((float) 1.0)
-                .latitude(lat)
-                .longitude(lon)
+                .latitude(ll.latitude)
+                .longitude(ll.longitude)
                 .build();
             mMap.setMyLocationData(locData);
+
             // 开始移动百度地图的定位地点到中心位置
-            LatLng ll = new LatLng(locData.latitude, locData.longitude);
+
             MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll, 16.0f);
             mMap.animateMapStatus(u);
+
         }
 
         @Override
@@ -87,11 +104,14 @@ public class AdasSimulatorActivity extends AppCompatActivity implements Compound
         intent.putExtra("filePath", filePath);
         bindService(intent, connection, Context.BIND_AUTO_CREATE);
 
+        mConverter = new CoordinateConverter();
 
         serverSwitch = (Switch) findViewById(R.id.server_switch);
         serverSwitch.setOnCheckedChangeListener(this);
 
         mMapView = (MapView) findViewById(R.id.map_view);
+
+        mCountTextView = (TextView) findViewById(R.id.count_tv);
 
         progressDialog = new ProgressDialog(this);
         progressDialog.setIndeterminate(false);
@@ -102,7 +122,6 @@ public class AdasSimulatorActivity extends AppCompatActivity implements Compound
 
         mMap = mMapView.getMap();
         mMap.setMyLocationEnabled(true);
-
 
     }
 

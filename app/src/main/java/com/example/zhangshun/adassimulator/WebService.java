@@ -38,7 +38,7 @@ import java.text.DecimalFormat;
 
 public class WebService extends Service {
 
-    public final int HTTP_PORT = 1234;
+    public final static int HTTP_PORT = 1234;
 
 
     static final String ACTION_START_WEB_SERVICE = "com.example.zhangshun.action.START_WEB_SERVICE";
